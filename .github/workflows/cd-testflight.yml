@@ -4,6 +4,9 @@ on:
   push:
     branches:
     - main 
+  pull_request:
+    branches:
+      - main
 
 jobs:
   upload-to-testflight:
@@ -42,7 +45,13 @@ jobs:
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
-      - name: Debug Build
+
+      - name: "#️⃣ Generate Build Number"
+        id: buildnumber
+        uses: einaregilsson/build-number@v3
+        with:
+          token: ${{ secrets.github_token }}
+      - name: Release Build
         env:
           scheme: ${{ 'default' }}
           platform: ${{ 'iOS Simulator' }}
@@ -52,7 +61,7 @@ jobs:
           if [ $scheme = default ]; then scheme=$(cat default); fi
           if [ "`ls -A | grep -i \\.xcworkspace\$`" ]; then filetype_parameter="workspace" && file_to_build="`ls -A | grep -i \\.xcworkspace\$`"; else filetype_parameter="project" && file_to_build="`ls -A | grep -i \\.xcodeproj\$`"; fi
           file_to_build=`echo $file_to_build | awk '{$1=$1;print}'`
-          xcodebuild clean -configuration Release -scheme "$scheme" archive -archivePath archive
+          xcodebuild clean -configuration Release -scheme "$scheme" -archivePath archive CURRENT_PROJECT_VERSION="${BUILD_NUMBER:-0}" archive
           xcodebuild -exportArchive -archivePath ./archive.xcarchive -exportPath ./build -exportOptionsPlist ./exportOptions.plist
 
       - name: Lookup IPA file
