@@ -79,3 +79,14 @@ jobs:
           file_to_build=`echo $file_to_build | awk '{$1=$1;print}'`
           xcodebuild clean -configuration Debug -scheme "$scheme" archive -archivePath archive
           xcodebuild -exportArchive -archivePath ./archive.xcarchive -exportPath ./build -exportOptionsPlist ./exportOptions.plist
+
+      - name: Lookup IPA file
+        run: echo "ipa_file_path=$(ls ./HelloApp/build/*.ipa)" >> $GITHUB_ENV
+
+      - name: Upload to DeployGate
+        uses: jmatsu/dg-upload-app-action@v0.2.0
+        with:
+          app_owner_name: poad
+          api_token: ${{ secrets.DEPLOYGATE_API_TOKEN }}
+          app_file_path: ${{ env.ipa_file_path }}
+          public: true
