@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  build: # make sure build/ci work properly
+  build:
     runs-on: macos-latest
     steps:
       - name: Checkout

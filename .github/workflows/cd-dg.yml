@@ -1,4 +1,4 @@
-name: upload to deploygate
+name: Upload to deploygate
  
 on:
   push:
@@ -6,7 +6,7 @@ on:
     - main 
 
 jobs:
-  build: # make sure build/ci work properly
+  build:
     runs-on: macos-latest
     steps:
       - name: Checkout

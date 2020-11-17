@@ -1,15 +1,12 @@
-name: upload to TestFlight
+name: Upload to TestFlight
  
 on:
   push:
     branches:
     - main 
-  pull_request:
-    branches:
-      - main
 
 jobs:
-  build: # make sure build/ci work properly
+  upload-to-testflight:
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -27,21 +24,21 @@ jobs:
           echo Using default scheme: $default
       - name: Create exportOptions.plist
         run: |
-          PROVISONING_PROFILE_UUID=${{ secrets.PROVISONING_PROFILE_UUID }}
+          PROVISONING_PROFILE_UUID=${{ secrets.DISTRIBUTE_PROVISONING_PROFILE_UUID }}
           TEAM_ID=${{ secrets.TEAM_ID }}
           touch HelloApp/exportOptions.plist
-          cat HelloApp/exportOptions.plist.template | sed -e s/\$\{PROVISONING_PROFILE_UUID\}/${PROVISONING_PROFILE_UUID}/g | sed -e s/\$\{TEAM_ID\}/${TEAM_ID}/g >> HelloApp/exportOptions.plist
+          cat HelloApp/exportOptions.plist-distribute.template | sed -e s/\$\{PROVISONING_PROFILE_UUID\}/${PROVISONING_PROFILE_UUID}/g | sed -e s/\$\{TEAM_ID\}/${TEAM_ID}/g >> HelloApp/exportOptions.plist
       - name: Import CodeSign Certificates
         uses: Apple-Actions/import-codesign-certs@v1
         with:
-          p12-file-base64: ${{ secrets.CERTIFICATES_FILE_BASE64 }}
-          p12-password: ${{ secrets.CERTIFICATES_PASSWORD }}
+          p12-file-base64: ${{ secrets.DISTRIBUTE_CERTIFICATES_FILE_BASE64 }}
+          p12-password: ${{ secrets.DISTRIBUTE_CERTIFICATES_PASSWORD }}
       - name: 'Download Provisioning Profiles'
         id: provisioning
         uses: apple-actions/download-provisioning-profiles@v1
         with: 
           bundle-id: 'com.github.poad.HelloApp'
-          profile-type: 'IOS_APP_DEVELOPMENT'
+          profile-type: 'IOS_APP_STORE'
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
@@ -55,7 +52,7 @@ jobs:
           if [ $scheme = default ]; then scheme=$(cat default); fi
           if [ "`ls -A | grep -i \\.xcworkspace\$`" ]; then filetype_parameter="workspace" && file_to_build="`ls -A | grep -i \\.xcworkspace\$`"; else filetype_parameter="project" && file_to_build="`ls -A | grep -i \\.xcodeproj\$`"; fi
           file_to_build=`echo $file_to_build | awk '{$1=$1;print}'`
-          xcodebuild clean -configuration Debug -scheme "$scheme" archive -archivePath archive
+          xcodebuild clean -configuration Release -scheme "$scheme" archive -archivePath archive
           xcodebuild -exportArchive -archivePath ./archive.xcarchive -exportPath ./build -exportOptionsPlist ./exportOptions.plist
 
       - name: Lookup IPA file
