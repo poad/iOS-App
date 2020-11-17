@@ -1,0 +1,70 @@
+name: upload to TestFlight
+ 
+on:
+  push:
+    branches:
+    - main 
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build: # make sure build/ci work properly
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set Xcode version
+        run: sudo xcode-select -switch /Applications/Xcode_12.2.app/
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Set Default Scheme
+        run: |
+          cd HelloApp
+          scheme_list=$(xcodebuild -list -json | tr -d "\n")
+          default=$(echo $scheme_list | ruby -e "require 'json'; puts JSON.parse(STDIN.gets)['project']['targets'][0]")
+          echo $default | cat >default
+          echo Using default scheme: $default
+      - name: Create exportOptions.plist
+        run: |
+          PROVISONING_PROFILE_UUID=${{ secrets.PROVISONING_PROFILE_UUID }}
+          TEAM_ID=${{ secrets.TEAM_ID }}
+          touch HelloApp/exportOptions.plist
+          cat HelloApp/exportOptions.plist.template | sed -e s/\$\{PROVISONING_PROFILE_UUID\}/${PROVISONING_PROFILE_UUID}/g | sed -e s/\$\{TEAM_ID\}/${TEAM_ID}/g >> HelloApp/exportOptions.plist
+      - name: Import CodeSign Certificates
+        uses: Apple-Actions/import-codesign-certs@v1
+        with:
+          p12-file-base64: ${{ secrets.CERTIFICATES_FILE_BASE64 }}
+          p12-password: ${{ secrets.CERTIFICATES_PASSWORD }}
+      - name: 'Download Provisioning Profiles'
+        id: provisioning
+        uses: apple-actions/download-provisioning-profiles@v1
+        with: 
+          bundle-id: 'com.github.poad.HelloApp'
+          profile-type: 'IOS_APP_DEVELOPMENT'
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+      - name: Debug Build
+        env:
+          scheme: ${{ 'default' }}
+          platform: ${{ 'iOS Simulator' }}
+        run: |
+          cd HelloApp
+          device=`instruments -s -devices | grep -oE 'iPhone.*?[^\(]+' | head -1 | awk '{$1=$1;print}'`
+          if [ $scheme = default ]; then scheme=$(cat default); fi
+          if [ "`ls -A | grep -i \\.xcworkspace\$`" ]; then filetype_parameter="workspace" && file_to_build="`ls -A | grep -i \\.xcworkspace\$`"; else filetype_parameter="project" && file_to_build="`ls -A | grep -i \\.xcodeproj\$`"; fi
+          file_to_build=`echo $file_to_build | awk '{$1=$1;print}'`
+          xcodebuild clean -configuration Debug -scheme "$scheme" archive -archivePath archive
+          xcodebuild -exportArchive -archivePath ./archive.xcarchive -exportPath ./build -exportOptionsPlist ./exportOptions.plist
+
+      - name: Lookup IPA file
+        run: echo "ipa_file_path=$(ls ./HelloApp/build/*.ipa)" >> $GITHUB_ENV
+
+      - name: 'Upload app to TestFlight'
+        uses: apple-actions/upload-testflight-build@v1
+        with: 
+          app-path: ${{ env.ipa_file_path }}
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
