@@ -46,12 +46,14 @@ jobs:
           api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
 
-      - name: "#️⃣ Generate Build Number"
+      - name: "#️⃣ Update Build Number"
         id: buildnumber
-        uses: einaregilsson/build-number@v3
+        uses: poad/xcode-build-number-auto-update@v1
         with:
-          token: ${{ secrets.github_token }}
-      - name: Release Build
+          path: ./HelloApp/HelloApp/Info.plist
+          new-number: ${{ github.run_number }}
+
+      - name: archive and export ipa
         env:
           scheme: ${{ 'default' }}
           platform: ${{ 'iOS Simulator' }}
